@@ -1,3 +1,5 @@
+catboost_info/
+
 # Large datasets (uncomment if needed)
 *.csv
 *.txt

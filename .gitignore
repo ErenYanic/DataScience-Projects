@@ -6,7 +6,6 @@ catboost_info/
 *.json
 *.parquet
 *.feather
-*.xlsx
 
 # Operating system files
 .DS_Store

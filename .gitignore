@@ -1,4 +1,5 @@
 catboost_info/
+models/
 
 # Large datasets (uncomment if needed)
 *.csv

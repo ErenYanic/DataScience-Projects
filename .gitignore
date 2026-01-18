@@ -1,6 +1,24 @@
 catboost_info/
 models/
 
+# Machine learning models (uncomment if needed)
+*.h5
+*.keras
+*.pkl
+*.pickle
+*.joblib
+*.pt
+*.pth
+*.ckpt
+*.pb
+*.onnx
+*.tflite
+*.bin
+*.safetensors
+*.model
+*.mar
+*.weights
+
 # Large datasets (uncomment if needed)
 *.csv
 *.txt

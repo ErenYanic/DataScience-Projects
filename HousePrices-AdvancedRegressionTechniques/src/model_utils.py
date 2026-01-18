@@ -45,31 +45,49 @@ class SklearnWrapper(BaseEstimator, RegressorMixin):
 class HousePricePreprocessor(BaseEstimator, TransformerMixin):
     """
     Centralised preprocessing pipeline that handles cleaning, feature engineering,
-    encoding, and scaling. Ensures the data structure matches the final 47 features
-    used during model training.
+    encoding, and scaling. Ensures the data structure matches the final features
+    used during model training after data leakage fixes.
     """
     def __init__(self):
-        # The definitive list of 47 features expected by the final model
+        # The definitive list of features expected by the final model (derived from X_train_proc columns)
         self.final_columns = [
-            'LivingArea_and_OverallQuality', 'TotalSF', 'FullBath', 'GarageCars', 'BsmtFinSF1', 
-            'Neighborhood', 'BedroomAbvGr', '2ndFlrSF', 'Fireplaces', 'TotalQual', 'TotalBsmtSF', 
-            'GrLivArea', 'TotRmsAbvGrd', 'RemodAge', 'OverallQual_and_OverallCond', 'LuxuryScore', 
-            'GarageArea', 'HouseAge', 'LotFrontage', 'TotalOutdoorSF', 'LotArea', 'BsmtQual_num', 
-            'HalfBath', 'BsmtUnfSF', 'TotalCond', 'BsmtExposure_Gd', 'BsmtExposure_Mn', 
-            'BsmtExposure_No', 'BsmtExposure_None', 'MSZoning_FV', 'MSZoning_RH', 'MSZoning_RL', 
-            'MSZoning_RM', 'KitchenQual_Fa', 'KitchenQual_Gd', 'KitchenQual_TA', 'BsmtFinType1_BLQ', 
-            'BsmtFinType1_GLQ', 'BsmtFinType1_LwQ', 'BsmtFinType1_None', 'BsmtFinType1_Rec', 
-            'BsmtFinType1_Unf', 'FireplaceQu_Fa', 'FireplaceQu_Gd', 'FireplaceQu_None', 
-            'FireplaceQu_Po', 'FireplaceQu_TA'
+            'LivingArea_and_OverallQuality', 'TotalSF', 'BsmtFinSF1', 'FullBath', 'GarageCars', 
+            '2ndFlrSF', 'TotalBsmtSF', 'Neighborhood', '1stFlrSF', 'GrLivArea', 'TotalQual', 
+            'BedroomAbvGr', 'OverallQual_and_OverallCond', 'TotalBath', 'RemodAge', 'LotFrontage', 
+            'OverallQual', 'HalfBath', 'TotalCond', 'GarageArea', 'KitchenQual_num', 'Kitchen_to_TotRms', 
+            'BsmtQual_num', 'QualityLevel_Poor', 'QualityLevel_Average', 'QualityLevel_Good', 
+            'QualityLevel_Excellent', 'FireplaceQu_Fa', 'FireplaceQu_Gd', 'FireplaceQu_None', 
+            'FireplaceQu_Po', 'FireplaceQu_TA', 'Neighborhood_Price_Level_Lower_Middle', 
+            'Neighborhood_Price_Level_Luxury', 'Neighborhood_Price_Level_Middle', 
+            'Neighborhood_Price_Level_Upper_Middle', 'MSZoning_FV', 'MSZoning_RH', 'MSZoning_RL', 
+            'MSZoning_RM', 'BsmtFinType1_BLQ', 'BsmtFinType1_GLQ', 'BsmtFinType1_LwQ', 
+            'BsmtFinType1_None', 'BsmtFinType1_Rec', 'BsmtFinType1_Unf', 'KitchenQual_Fa', 
+            'KitchenQual_Gd', 'KitchenQual_TA', 'MSSubClass_1.5story_unf', 'MSSubClass_1story_1945-', 
+            'MSSubClass_1story_1946+', 'MSSubClass_1story_PUD_1946+', 'MSSubClass_1story_unf_attic', 
+            'MSSubClass_2.5story_all_ages', 'MSSubClass_2family_conversion', 'MSSubClass_2story_1945-', 
+            'MSSubClass_2story_1946+', 'MSSubClass_2story_PUD_1946+', 'MSSubClass_PUD_multilevel', 
+            'MSSubClass_duplex_all_style_age', 'MSSubClass_split_foyer', 'MSSubClass_split_multilevel'
         ]
         
         # Mappings for ordinal features
         self.qual_map = {'Ex': 5, 'Gd': 4, 'TA': 3, 'Fa': 2, 'Po': 1, 'NA': 0, 'None': 0}
         
         # Columns designated for One-Hot Encoding
+        # Note: Added QualityLevel, Neighborhood_Price_Level, and MSSubClass as they appear in final columns
         self.ohe_columns = [
-            'BsmtExposure', 'MSZoning', 'KitchenQual', 'BsmtFinType1', 'FireplaceQu'
+            'BsmtExposure', 'MSZoning', 'KitchenQual', 'BsmtFinType1', 'FireplaceQu',
+            'QualityLevel', 'Neighborhood_Price_Level', 'MSSubClass'
         ]
+        
+        # Neighborhood mapping for grouping
+        self.neighborhood_tiers = {
+            "Luxury": ["NoRidge", "NridgHt", "StoneBr"],
+            "Upper_Middle": ["Timber", "Veenker", "Somerst", "ClearCr", "Crawfor"],
+            "Middle": ["CollgCr", "Blmngtn", "Gilbert", "NWAmes", "SawyerW"],
+            "Lower_Middle": ["Mitchel", "NAmes", "NPkVill", "SWISU", "Blueste", 
+                            "Sawyer", "OldTown", "Edwards", "BrkSide"],
+            "Budget": ["BrDale", "IDOTRR", "MeadowV"]
+        }
         
         # State variables learnt during fitting
         self.neighborhood_map = {}
@@ -109,7 +127,6 @@ class HousePricePreprocessor(BaseEstimator, TransformerMixin):
                 df[f"{col}_num"] = 0
 
         # Feature creation logic matching the training phase
-        # Safely using .get() with default 0 for arithmetic operations
         df["LivingArea_and_OverallQuality"] = df.get("GrLivArea", 0) * df.get("OverallQual", 0)
         df["TotalSF"] = df.get("GrLivArea", 0) + df.get("TotalBsmtSF", 0)
         
@@ -120,41 +137,64 @@ class HousePricePreprocessor(BaseEstimator, TransformerMixin):
         df["RemodAge"] = df.get("YrSold", 0) - df.get("YearRemodAdd", 0)
         df["OverallQual_and_OverallCond"] = df.get("OverallQual", 0) * df.get("OverallCond", 0)
 
-        # Luxury Score Calculation - FIXED FOR ROBUSTNESS
-        # We check if the column exists to use .astype(), otherwise use scalar 0.
-        
-        # 1. Pool
-        if "PoolArea" in df.columns:
-            pool = (df["PoolArea"].fillna(0) > 0).astype(int)
-        else:
-            pool = 0
-            
-        # 2. Fireplaces
-        if "Fireplaces" in df.columns:
-            fire = (df["Fireplaces"].fillna(0) > 1).astype(int)
-        else:
-            fire = 0
-            
-        # 3. Garage
-        if "GarageCars" in df.columns:
-            garage = (df["GarageCars"].fillna(0) > 2).astype(int)
-        else:
-            garage = 0
-            
-        # 4. Overall Quality
+        # 1. Quality Level Grouping (Binning)
         if "OverallQual" in df.columns:
-            qual = (df["OverallQual"].fillna(0) >= 8).astype(int)
+            df["QualityLevel"] = pd.cut(
+                df["OverallQual"],
+                bins=[0, 2, 4, 5, 7, 10],
+                labels=["Very Poor", "Poor", "Average", "Good", "Excellent"],
+                include_lowest=True
+            ).astype(str) # Convert to string for OHE
         else:
-            qual = 0
+            df["QualityLevel"] = "Average" # Default fallback
+
+        # 2. Neighborhood Price Level
+        neighborhood_price_map = {neighborhood: tier 
+                                for tier, neighborhoods in self.neighborhood_tiers.items() 
+                                for neighborhood in neighborhoods}
+        
+        if "Neighborhood" in df.columns:
+            df["Neighborhood_Price_Level"] = df["Neighborhood"].map(neighborhood_price_map).fillna("Other")
+        else:
+            df["Neighborhood_Price_Level"] = "Other"
+
+        # 3. Total Bathrooms
+        # Using .get() with default 0 to be safe against missing columns
+        df["TotalBath"] = (df.get("FullBath", 0) +
+                           0.5 * df.get("HalfBath", 0) +
+                           df.get("BsmtFullBath", 0) +
+                           0.5 * df.get("BsmtHalfBath", 0))
+
+        # 4. Kitchen Ratio
+        # Avoid division by zero
+        tot_rms = df.get("TotRmsAbvGrd", 0)
+        kitchens = df.get("KitchenAbvGr", 0)
+        df["Kitchen_to_TotRms"] = np.where(tot_rms > 0, kitchens / tot_rms, 0)
+        
+        # 5. MSSubClass Mapping (if needed for OHE consistency)
+        # Note: MSSubClass is numeric but treated as categorical. 
+        # In the provided columns, it appears as 'MSSubClass_2story...' which implies conversion to string.
+        if "MSSubClass" in df.columns:
+            # Re-apply the mapping logic if it's still numeric
+            # Assuming 'mssubclass_map' was applied earlier or needs to be applied here.
+            # Based on column names, let's ensure it's a string for OHE.
+            # Using a simplified mapping logic based on your previous file or treating as str
+            # If explicit mapping is required, it should be defined here. 
+            # For now, converting to string enables OHE to generate 'MSSubClass_XX'.
+            # However, looking at your column list 'MSSubClass_1story_1946+', 
+            # it implies a specific text mapping was used. Let's include that mapping.
             
-        df["LuxuryScore"] = (pool * 3 + fire * 2 + garage * 2 + qual * 3)
-
-        df["HouseAge"] = df.get("YrSold", 0) - df.get("YearBuilt", 0)
-
-        # Outdoor Space
-        total_porch = (df.get("OpenPorchSF", 0) + df.get("EnclosedPorch", 0) + 
-                       df.get("3SsnPorch", 0) + df.get("ScreenPorch", 0))
-        df["TotalOutdoorSF"] = total_porch + df.get("WoodDeckSF", 0)
+            mssubclass_map = {
+                20: '1story_1946+', 30: '1story_1945-', 40: '1story_unf_attic',
+                45: '1.5story_unf', 50: '1.5story_fin', 60: '2story_1946+',
+                70: '2story_1945-', 75: '2.5story_all_ages', 80: 'split_multilevel',
+                85: 'split_foyer', 90: 'duplex_all_style_age', 120: '1story_PUD_1946+',
+                150: '1.5story_PUD_all', 160: '2story_PUD_1946+', 180: 'PUD_multilevel',
+                190: '2family_conversion'
+            }
+            # Only map if it's numeric, otherwise assume it's already mapped
+            if pd.api.types.is_numeric_dtype(df["MSSubClass"]):
+                 df["MSSubClass"] = df["MSSubClass"].map(mssubclass_map).fillna("Other")
 
         df["TotalCond"] = (df.get("OverallCond", 0) + df.get("ExterCond_num", 0) +
                            df.get("BsmtCond_num", 0) + df.get("GarageCond_num", 0))
@@ -198,7 +238,7 @@ class HousePricePreprocessor(BaseEstimator, TransformerMixin):
             # Fill unseen neighbourhoods with the global mean
             X['Neighborhood'] = X['Neighborhood'].map(self.neighborhood_map).fillna(self.global_target_mean)
         
-        # 3. Apply One-Hot Encoding (using pandas for simplicity in this context)
+        # 3. Apply One-Hot Encoding
         for col in self.ohe_columns:
             if col in X.columns:
                 dummies = pd.get_dummies(X[col], prefix=col)
@@ -210,7 +250,7 @@ class HousePricePreprocessor(BaseEstimator, TransformerMixin):
             if col not in X.columns:
                 X[col] = 0
         
-        # Select exactly the 47 features in the correct order
+        # Select exactly the final features in the correct order
         X_final = X[self.final_columns]
         
         # 5. Scaling
@@ -221,7 +261,6 @@ class HousePricePreprocessor(BaseEstimator, TransformerMixin):
         
         # Return as DataFrame to preserve column names
         return pd.DataFrame(X_scaled, columns=self.final_columns, index=X.index)
-
 
 # Serialization Utilities
 def save_production_model(model, metrics, filename="stacking_model_v1.joblib", output_dir="models"):

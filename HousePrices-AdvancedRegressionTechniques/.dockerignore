@@ -1,0 +1,22 @@
+# Exclude git history and configuration
+.git
+.gitignore
+
+# Exclude virtual environments (Crucial)
+uv_DataScience/
+.venv/
+env/
+venv/
+
+# Exclude Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+
+# Exclude IDE settings
+.vscode/
+.idea/
+
+# Exclude local test artefacts if necessary
+# models/*.joblib  <-- Bunu kapalı tutuyoruz, modeli kopyalamamız lazım!

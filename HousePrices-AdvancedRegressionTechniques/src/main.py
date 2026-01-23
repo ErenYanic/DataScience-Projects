@@ -18,7 +18,7 @@ from src.predict import HousePricePredictor
 # Includes metadata for the auto-generated documentation
 app = FastAPI(
     title="House Price Prediction API",
-    description="Production-ready API for estimating house prices in Ames, Iowa.",
+    description="Production-ready API for estimating house prices in HousePrices - Advanced Regression Techniques.",
     version="1.0.0"
 )
 

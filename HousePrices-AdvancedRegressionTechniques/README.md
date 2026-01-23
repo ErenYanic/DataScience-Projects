@@ -140,6 +140,20 @@ curl -X POST "http://localhost:8000/predict" \
 }
 ```
 
+### Docker Deployment
+
+Build and run the application in an isolated container:
+
+```bash
+# Build the image
+docker build -t house-prices-api .
+
+# Run the container
+docker run -p 8000:8000 house-prices-api
+```
+
+The API becomes accessible at `http://localhost:8000`. The Docker image includes all dependencies and trained models, ensuring consistent execution across environments.
+
 ## Model Details
 
 ### Base Learners

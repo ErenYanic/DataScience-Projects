@@ -8,6 +8,10 @@ This project tackles the Kaggle House Prices competition using a structured, mod
 
 **Key Performance**: Validation RMSLE ≈ 0.11 (log-transformed SalePrice prediction)
 
+## Kaggle Notebook
+
+The complete exploratory data analysis and model development process is documented in a [Kaggle notebook](https://www.kaggle.com/code/erenyanic/house-prices-advanced-regression-techniques), featuring interactive visualisations, statistical insights, and iterative experimentation with various regression techniques.
+
 ## Project Structure
 
 ```

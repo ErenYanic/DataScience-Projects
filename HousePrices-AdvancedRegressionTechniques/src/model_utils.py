@@ -4,7 +4,7 @@ import datetime
 import pandas as pd
 import numpy as np
 from sklearn.base import BaseEstimator, RegressorMixin, TransformerMixin, clone
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MaxAbsScaler
 
 # Compatibility Wrapper for Sklearn 1.6+ 
 class SklearnWrapper(BaseEstimator, RegressorMixin):
@@ -62,10 +62,10 @@ class HousePricePreprocessor(BaseEstimator, TransformerMixin):
             'Neighborhood_Price_Level_Upper_Middle', 'MSZoning_FV', 'MSZoning_RH', 'MSZoning_RL', 
             'MSZoning_RM', 'BsmtFinType1_BLQ', 'BsmtFinType1_GLQ', 'BsmtFinType1_LwQ', 
             'BsmtFinType1_None', 'BsmtFinType1_Rec', 'BsmtFinType1_Unf', 'KitchenQual_Fa', 
-            'KitchenQual_Gd', 'KitchenQual_TA', 'MSSubClass_1.5story_unf', 'MSSubClass_1story_1945-', 
-            'MSSubClass_1story_1946+', 'MSSubClass_1story_PUD_1946+', 'MSSubClass_1story_unf_attic', 
-            'MSSubClass_2.5story_all_ages', 'MSSubClass_2family_conversion', 'MSSubClass_2story_1945-', 
-            'MSSubClass_2story_1946+', 'MSSubClass_2story_PUD_1946+', 'MSSubClass_PUD_multilevel', 
+            'KitchenQual_Gd', 'KitchenQual_TA', 'MSSubClass_1.5storey_unf', 'MSSubClass_1storey_1945-', 
+            'MSSubClass_1storey_1946+', 'MSSubClass_1storey_PUD_1946+', 'MSSubClass_1storey_unf_attic', 
+            'MSSubClass_2.5storey_all_ages', 'MSSubClass_2family_conversion', 'MSSubClass_2storey_1945-', 
+            'MSSubClass_2storey_1946+', 'MSSubClass_2storey_PUD_1946+', 'MSSubClass_PUD_multilevel', 
             'MSSubClass_duplex_all_style_age', 'MSSubClass_split_foyer', 'MSSubClass_split_multilevel'
         ]
         
@@ -93,25 +93,57 @@ class HousePricePreprocessor(BaseEstimator, TransformerMixin):
         self.neighborhood_map = {}
         self.global_target_mean = 0
         self.medians = {}
-        self.scaler = StandardScaler()
+        self.lot_frontage_by_neighborhood = {}
+        self.lot_frontage_global_median = 0
+        self.electrical_mode = None
+        self.scaler = MaxAbsScaler()
 
     def _impute_missing(self, X):
-        """Internal method to handle missing values using learnt medians."""
+        """
+        Internal method to handle missing values using learnt parameters.
+        Mirrors the logic from create_missing_value_handler in the notebook.
+        """
         X = X.copy()
         
-        # Numerical imputation
-        num_cols = ['LotFrontage', 'GarageArea', 'TotalBsmtSF', 'BsmtUnfSF', 'BsmtFinSF1', 'GarageCars']
-        for col in num_cols:
+        # 1. Categorical: Fill with "None" (feature doesn't exist)
+        cat_none_cols = [
+            "BsmtQual", "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinType2",
+            "GarageType", "GarageFinish", "GarageQual", "GarageCond",
+            "Alley", "PoolQC", "MiscFeature", "FireplaceQu", "MasVnrType", "Fence",
+            "KitchenQual", "MSZoning"
+        ]
+        for col in cat_none_cols:
             if col in X.columns:
-                median_val = self.medians.get(col, 0)
-                X[col] = X[col].fillna(median_val)
-        
-        # Categorical imputation
-        cat_cols = ['BsmtExposure', 'BsmtFinType1', 'FireplaceQu', 'KitchenQual', 'MSZoning', 'BsmtQual']
-        for col in cat_cols:
+                X[col] = X[col].fillna("None")
+
+        # 2. Numerical: Fill with 0 (feature doesn't exist)
+        num_zero_cols = [
+            "MasVnrArea", "BsmtFinSF1", "BsmtFinSF2", "BsmtUnfSF", 
+            "TotalBsmtSF", "BsmtFullBath", "BsmtHalfBath", 
+            "GarageCars", "GarageArea"
+        ]
+        for col in num_zero_cols:
             if col in X.columns:
-                X[col] = X[col].fillna('None')
-                
+                X[col] = X[col].fillna(0)
+
+        # 3. LotFrontage: Use learnt neighbourhood-specific medians
+        if "LotFrontage" in X.columns and "Neighborhood" in X.columns:
+            X["LotFrontage"] = X.apply(
+                lambda row: self.lot_frontage_by_neighborhood.get(
+                    row["Neighborhood"], 
+                    self.lot_frontage_global_median
+                ) if pd.isna(row["LotFrontage"]) else row["LotFrontage"],
+                axis=1
+            )
+
+        # 4. GarageYrBlt: Sentinel value for missing
+        if "GarageYrBlt" in X.columns:
+            X["GarageYrBlt"] = X["GarageYrBlt"].fillna(-1)
+
+        # 5. Electrical: Use learnt mode
+        if "Electrical" in X.columns and self.electrical_mode is not None:
+            X["Electrical"] = X["Electrical"].fillna(self.electrical_mode)
+
         return X
 
     def _feature_engineering(self, df):
@@ -173,7 +205,7 @@ class HousePricePreprocessor(BaseEstimator, TransformerMixin):
         
         # 5. MSSubClass Mapping (if needed for OHE consistency)
         # Note: MSSubClass is numeric but treated as categorical. 
-        # In the provided columns, it appears as 'MSSubClass_2story...' which implies conversion to string.
+        # In the provided columns, it appears as 'MSSubClass_2storey...' which implies conversion to string.
         if "MSSubClass" in df.columns:
             # Re-apply the mapping logic if it's still numeric
             # Assuming 'mssubclass_map' was applied earlier or needs to be applied here.
@@ -181,15 +213,15 @@ class HousePricePreprocessor(BaseEstimator, TransformerMixin):
             # Using a simplified mapping logic based on your previous file or treating as str
             # If explicit mapping is required, it should be defined here. 
             # For now, converting to string enables OHE to generate 'MSSubClass_XX'.
-            # However, looking at your column list 'MSSubClass_1story_1946+', 
+            # However, looking at your column list 'MSSubClass_1storey_1946+', 
             # it implies a specific text mapping was used. Let's include that mapping.
             
             mssubclass_map = {
-                20: '1story_1946+', 30: '1story_1945-', 40: '1story_unf_attic',
-                45: '1.5story_unf', 50: '1.5story_fin', 60: '2story_1946+',
-                70: '2story_1945-', 75: '2.5story_all_ages', 80: 'split_multilevel',
-                85: 'split_foyer', 90: 'duplex_all_style_age', 120: '1story_PUD_1946+',
-                150: '1.5story_PUD_all', 160: '2story_PUD_1946+', 180: 'PUD_multilevel',
+                20: '1storey_1946+', 30: '1storey_1945-', 40: '1storey_unf_attic',
+                45: '1.5storey_unf', 50: '1.5storey_fin', 60: '2storey_1946+',
+                70: '2storey_1945-', 75: '2.5storey_all_ages', 80: 'split_multilevel',
+                85: 'split_foyer', 90: 'duplex_all_style_age', 120: '1storey_PUD_1946+',
+                150: '1.5storey_PUD_all', 160: '2storey_PUD_1946+', 180: 'PUD_multilevel',
                 190: '2family_conversion'
             }
             # Only map if it's numeric, otherwise assume it's already mapped
@@ -205,21 +237,32 @@ class HousePricePreprocessor(BaseEstimator, TransformerMixin):
         """Learns statistical parameters (medians, target encoding, scaling) from training data."""
         X = X.copy()
         
-        # 1. Learn medians for imputation
-        for col in ['LotFrontage', 'GarageArea', 'TotalBsmtSF', 'BsmtUnfSF', 'BsmtFinSF1', 'GarageCars']:
+        # 1. Learn medians for numerical imputation
+        num_median_cols = ['GarageArea', 'TotalBsmtSF', 'BsmtUnfSF', 'BsmtFinSF1', 'GarageCars']
+        for col in num_median_cols:
             if col in X.columns:
                 self.medians[col] = X[col].median()
         
-        # 2. Apply engineering to prepare for encoding learning
+        # 2. Learn LotFrontage neighbourhood-specific medians (to avoid data leakage)
+        if "LotFrontage" in X.columns and "Neighborhood" in X.columns:
+            self.lot_frontage_by_neighborhood = X.groupby("Neighborhood")["LotFrontage"].median().to_dict()
+            self.lot_frontage_global_median = X["LotFrontage"].median()
+        
+        # 3. Learn Electrical mode
+        if "Electrical" in X.columns:
+            modes = X["Electrical"].mode()
+            self.electrical_mode = modes[0] if not modes.empty else None
+        
+        # 4. Apply engineering to prepare for encoding learning
         X = self._impute_missing(X)
         X = self._feature_engineering(X)
         
-        # 3. Learn Target Encoding (Neighborhood)
+        # 5. Learn Target Encoding (Neighborhood)
         if y is not None and 'Neighborhood' in X.columns:
             self.neighborhood_map = y.groupby(X['Neighborhood']).mean().to_dict()
             self.global_target_mean = y.mean()
         
-        # 4. Simulate transform to fit the Scaler correctly
+        # 6. Simulate transform to fit the Scaler correctly
         X_transformed = self.transform(X, fit_mode=True)
         self.scaler.fit(X_transformed)
         

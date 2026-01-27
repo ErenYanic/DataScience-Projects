@@ -51,22 +51,16 @@ class HousePricePreprocessor(BaseEstimator, TransformerMixin):
     def __init__(self):
         # The definitive list of features expected by the final model (derived from X_train_proc columns)
         self.final_columns = [
-            'LivingArea_and_OverallQuality', 'TotalSF', 'BsmtFinSF1', 'FullBath', 'GarageCars', 
-            '2ndFlrSF', 'TotalBsmtSF', 'Neighborhood', '1stFlrSF', 'GrLivArea', 'TotalQual', 
-            'BedroomAbvGr', 'OverallQual_and_OverallCond', 'TotalBath', 'RemodAge', 'LotFrontage', 
-            'OverallQual', 'HalfBath', 'TotalCond', 'GarageArea', 'KitchenQual_num', 'Kitchen_to_TotRms', 
-            'BsmtQual_num', 'QualityLevel_Poor', 'QualityLevel_Average', 'QualityLevel_Good', 
-            'QualityLevel_Excellent', 'FireplaceQu_Fa', 'FireplaceQu_Gd', 'FireplaceQu_None', 
-            'FireplaceQu_Po', 'FireplaceQu_TA', 'Neighborhood_Price_Level_Lower_Middle', 
-            'Neighborhood_Price_Level_Luxury', 'Neighborhood_Price_Level_Middle', 
-            'Neighborhood_Price_Level_Upper_Middle', 'MSZoning_FV', 'MSZoning_RH', 'MSZoning_RL', 
-            'MSZoning_RM', 'BsmtFinType1_BLQ', 'BsmtFinType1_GLQ', 'BsmtFinType1_LwQ', 
-            'BsmtFinType1_None', 'BsmtFinType1_Rec', 'BsmtFinType1_Unf', 'KitchenQual_Fa', 
-            'KitchenQual_Gd', 'KitchenQual_TA', 'MSSubClass_1.5storey_unf', 'MSSubClass_1storey_1945-', 
-            'MSSubClass_1storey_1946+', 'MSSubClass_1storey_PUD_1946+', 'MSSubClass_1storey_unf_attic', 
-            'MSSubClass_2.5storey_all_ages', 'MSSubClass_2family_conversion', 'MSSubClass_2storey_1945-', 
-            'MSSubClass_2storey_1946+', 'MSSubClass_2storey_PUD_1946+', 'MSSubClass_PUD_multilevel', 
-            'MSSubClass_duplex_all_style_age', 'MSSubClass_split_foyer', 'MSSubClass_split_multilevel'
+            'LivingArea_and_OverallQuality', 'TotalSF', 'BsmtFinSF1', 'OverallQual_and_OverallCond', '1stFlrSF', 
+            'GrLivArea', 'GarageCars', '2ndFlrSF', 'CentralAir', 'RemodAge', 'GarageArea', 'TotalQual', 'FullBath', 
+            'TotalCond', 'OverallCond', 'Neighborhood', 'HalfBath', 'HouseAge', 'GarageYrBlt', 'YearRemodAdd', 
+            'LotFrontage', 'LotArea', 'MSZoning_FV', 'MSZoning_RH', 'MSZoning_RL', 'MSZoning_RM', 'QualityLevel_Poor', 
+            'QualityLevel_Average', 'QualityLevel_Good', 'QualityLevel_Excellent', 'Neighborhood_Price_Level_Lower_Middle', 
+            'Neighborhood_Price_Level_Luxury', 'Neighborhood_Price_Level_Middle', 'Neighborhood_Price_Level_Upper_Middle', 
+            'BsmtExposure_Gd', 'BsmtExposure_Mn', 'BsmtExposure_No', 'BsmtExposure_None', 'Condition1_Feedr', 'Condition1_Norm', 
+            'Condition1_PosA', 'Condition1_PosN', 'Condition1_RRAe', 'Condition1_RRAn', 'Condition1_RRNe', 'Condition1_RRNn', 
+            'GarageFinish_None', 'GarageFinish_RFn', 'GarageFinish_Unf', 'FireplaceQu_Fa', 'FireplaceQu_Gd',
+            'FireplaceQu_None', 'FireplaceQu_Po', 'FireplaceQu_TA', 'KitchenQual_Fa', 'KitchenQual_Gd', 'KitchenQual_TA'
         ]
         
         # Mappings for ordinal features
@@ -76,7 +70,8 @@ class HousePricePreprocessor(BaseEstimator, TransformerMixin):
         # Note: Added QualityLevel, Neighborhood_Price_Level, and MSSubClass as they appear in final columns
         self.ohe_columns = [
             'BsmtExposure', 'MSZoning', 'KitchenQual', 'BsmtFinType1', 'FireplaceQu',
-            'QualityLevel', 'Neighborhood_Price_Level', 'MSSubClass'
+            'QualityLevel', 'Neighborhood_Price_Level', 'MSSubClass', 'GarageFinish',
+            'Condition1'
         ]
         
         # Neighborhood mapping for grouping
@@ -167,6 +162,7 @@ class HousePricePreprocessor(BaseEstimator, TransformerMixin):
                            df.get("HeatingQC_num", 0) + df.get("GarageQual_num", 0))
 
         df["RemodAge"] = df.get("YrSold", 0) - df.get("YearRemodAdd", 0)
+        df["HouseAge"] = df.get("YrSold", 0) - df.get("YearBuilt", 0)  # House age at time of sale
         df["OverallQual_and_OverallCond"] = df.get("OverallQual", 0) * df.get("OverallCond", 0)
 
         # 1. Quality Level Grouping (Binning)
@@ -189,21 +185,8 @@ class HousePricePreprocessor(BaseEstimator, TransformerMixin):
             df["Neighborhood_Price_Level"] = df["Neighborhood"].map(neighborhood_price_map).fillna("Other")
         else:
             df["Neighborhood_Price_Level"] = "Other"
-
-        # 3. Total Bathrooms
-        # Using .get() with default 0 to be safe against missing columns
-        df["TotalBath"] = (df.get("FullBath", 0) +
-                           0.5 * df.get("HalfBath", 0) +
-                           df.get("BsmtFullBath", 0) +
-                           0.5 * df.get("BsmtHalfBath", 0))
-
-        # 4. Kitchen Ratio
-        # Avoid division by zero
-        tot_rms = df.get("TotRmsAbvGrd", 0)
-        kitchens = df.get("KitchenAbvGr", 0)
-        df["Kitchen_to_TotRms"] = np.where(tot_rms > 0, kitchens / tot_rms, 0)
         
-        # 5. MSSubClass Mapping (if needed for OHE consistency)
+        # 3. MSSubClass Mapping (if needed for OHE consistency)
         # Note: MSSubClass is numeric but treated as categorical. 
         # In the provided columns, it appears as 'MSSubClass_2storey...' which implies conversion to string.
         if "MSSubClass" in df.columns:
@@ -230,6 +213,10 @@ class HousePricePreprocessor(BaseEstimator, TransformerMixin):
 
         df["TotalCond"] = (df.get("OverallCond", 0) + df.get("ExterCond_num", 0) +
                            df.get("BsmtCond_num", 0) + df.get("GarageCond_num", 0))
+        
+        # 4. Binary Encoding for CentralAir (Y/N -> 1/0)
+        if "CentralAir" in df.columns:
+            df["CentralAir"] = df["CentralAir"].map({'Y': 1, 'N': 0}).fillna(0)
                            
         return df
 

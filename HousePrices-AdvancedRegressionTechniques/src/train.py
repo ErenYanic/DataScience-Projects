@@ -51,13 +51,13 @@ def main():
     
     # Separate Target and Features
     X = df.drop("SalePrice", axis=1)
-    y = np.log1p(df["SalePrice"]) # Apply Log transformation to target
+    y = np.log1p(df["SalePrice"])  # Log-transform target for RMSLE
     
     # Split Data (Must match the logic used in R&D to prevent leakage)
     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
     
-    print(f"   - Training samples:   {X_train.shape[0]}")
-    print(f"   - Validation samples: {X_val.shape[0]}")
+    print(f"Training samples:   {X_train.shape[0]}")
+    print(f"Validation samples: {X_val.shape[0]}")
 
     # --------------------------------------------------------------------------
     # 2. PREPROCESSING
@@ -77,7 +77,7 @@ def main():
     # Save the preprocessor artefact immediately
     prep_path = os.path.join(MODELS_DIR, "preprocessor.joblib")
     joblib.dump(preprocessor, prep_path)
-    print(f"   ✓ Preprocessor saved to: {prep_path}")
+    print(f"Preprocessor saved to: {prep_path}")
 
     # --------------------------------------------------------------------------
     # 3. HYPERPARAMETER OPTIMISATION
@@ -91,13 +91,13 @@ def main():
         y_train=y_train,
         X_val=X_val_proc,
         y_val=y_val,
-        models=['catboost', 'xgboost', 'elasticnet', 'lightgbm', 'random_forest'],
+        models=['catboost', 'xgboost', 'elasticnet', 'lightgbm', 'random_forest', 'svr'],
         n_trials=200,  # Adjustable: Increase for better accuracy, decrease for speed
         cv=5,
         verbose=1
     )
     
-    print("\n   --- Optimisation Leaderboard ---")
+    print("\n--- Optimisation Leaderboard ---")
     print(summary_df[['Model', 'CV_RMSLE', 'Val_RMSLE']].to_string(index=False))
 
     # --------------------------------------------------------------------------
@@ -111,7 +111,7 @@ def main():
         y_train=y_train,
         X_val=X_val_proc, 
         y_val=y_val, 
-        included_models=['catboost', 'xgboost', 'elasticnet', 'lightgbm', 'random_forest'],
+        included_models=['catboost', 'xgboost', 'elasticnet', 'lightgbm', 'random_forest', 'svr'],
         verbose=1
     )
 
@@ -137,14 +137,14 @@ def main():
         filename=versioned_filename, 
         output_dir=MODELS_DIR
     )
-    print(f"   ✓ Archived version saved: {versioned_filename}")
+    print(f"Archived version saved: {versioned_filename}")
     
     # 4. Update the 'Latest' copy (The Active Production Model)
     # We copy the newly created versioned file to 'final_model.joblib'.
     # Predict.py will always look for 'final_model.joblib'.
     latest_path = os.path.join(MODELS_DIR, latest_filename)
     shutil.copy(versioned_path, latest_path)
-    print(f"   ✓ Active production model updated: {latest_filename}")
+    print(f"Active production model updated: {latest_filename}")
     
     print("\n" + "="*60)
     print("PIPELINE COMPLETED SUCCESSFULLY")

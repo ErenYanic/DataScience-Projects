@@ -6,11 +6,13 @@ A production-ready machine learning system for predicting residential property p
 
 This project tackles the Kaggle House Prices competition using a structured, modular approach. The solution employs gradient boosting methods (CatBoost, XGBoost, LightGBM), traditional regression models (ElasticNet), and tree-based ensembles (Random Forest) combined through a stacking regressor. The system features comprehensive preprocessing, target encoding, and feature engineering pipelines designed to handle missing data and maintain consistency between training and inference.
 
-**Key Performance**: Validation RMSLE ≈ 0.11 (log-transformed SalePrice prediction)
+**Key Performance**: Validation RMSLE: 0.00993 | Validation R²: 0.91516 (log-transformed SalePrice prediction)
 
 ## Kaggle Notebook
 
 The complete exploratory data analysis and model development process is documented in a [Kaggle notebook](https://www.kaggle.com/code/erenyanic/house-prices-advanced-regression-techniques), featuring interactive visualisations, statistical insights, and iterative experimentation with various regression techniques.
+
+**Competition Performance**: Achieved RMSLE of 0.12675 on the test dataset, ranking 1055th globally.
 
 ## Project Structure
 
@@ -162,19 +164,24 @@ The API becomes accessible at `http://localhost:8000`. The Docker image includes
 
 ### Base Learners
 
-| Model          | Hyperparameters Tuned                          | Validation RMSLE |
-|----------------|------------------------------------------------|------------------|
-| CatBoost       | iterations, depth, learning_rate, l2_leaf_reg  | ~0.115           |
-| XGBoost        | n_estimators, max_depth, eta, subsample        | ~0.117           |
-| LightGBM       | num_leaves, learning_rate, feature_fraction    | ~0.118           |
-| ElasticNet     | alpha, l1_ratio                                | ~0.125           |
-| Random Forest  | n_estimators, max_depth, min_samples_split     | ~0.130           |
+| Model          | Hyperparameters Tuned                          | Validation RMSLE | Validation R² |
+|----------------|------------------------------------------------|------------------|---------------|
+| CatBoost       | iterations, depth, learning_rate, l2_leaf_reg  | 0.011            | 0.903         |
+| XGBoost        | n_estimators, max_depth, eta, subsample        | 0.010            | 0.907         |
+| LightGBM       | num_leaves, learning_rate, feature_fraction    | 0.011            | 0.894         |
+| SVR            | C, epsilon, gamma                              | 0.010            | 0.918         |
+| ElasticNet     | alpha, l1_ratio                                | 0.010            | 0.911         |
+| Random Forest  | n_estimators, max_depth, min_samples_split     | 0.011            | 0.895         |
+| KNN            | n_neighbors, weights, metric                   | 0.014            | 0.837         |
 
 ### Ensemble
 
 - **Architecture**: Stacking Regressor with Ridge meta-learner
+- **Base Models**: CatBoost, XGBoost, LightGBM, Random Forest, ElasticNet, SVR
 - **Cross-Validation**: 5-fold stratified CV for out-of-fold predictions
-- **Final Validation RMSLE**: ~0.110
+- **Final Performance**:
+  - **Validation RMSLE**: 0.00993
+  - **Validation R²**: 0.91516
 
 ## Dependencies
 

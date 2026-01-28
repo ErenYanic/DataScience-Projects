@@ -1,4 +1,5 @@
 import time
+import inspect
 import numpy as np
 import pandas as pd
 import optuna
@@ -520,10 +521,13 @@ def train_dynamic_stacking(
         # Handle random_state safety for applicable models
         if 'random_state' in best_params:
             model_instance = model_class(**best_params)
-        elif hasattr(model_class(), 'random_state'):
-            model_instance = model_class(**best_params, random_state=random_state)
         else:
-            model_instance = model_class(**best_params)
+            # Init parametrelerini kontrol et
+            sig = inspect.signature(model_class.__init__)
+            if 'random_state' in sig.parameters:
+                model_instance = model_class(**best_params, random_state=random_state)
+            else:
+                model_instance = model_class(**best_params)
 
         # Apply wrapper to specific boosting models to fix sklearn 1.6+ compatibility
         if model_name in ['catboost', 'xgboost', 'lightgbm']:

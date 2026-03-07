@@ -12,7 +12,7 @@ This project tackles the Kaggle House Prices competition using a structured, mod
 
 The complete exploratory data analysis and model development process is documented in a [Kaggle notebook](https://www.kaggle.com/code/erenyanic/house-prices-advanced-regression-techniques), featuring interactive visualisations, statistical insights, and iterative experimentation with various regression techniques.
 
-**Competition Performance**: Achieved RMSLE of 0.12675 on the test dataset, ranking 1055th globally.
+**Competition Performance**: Achieved RMSLE of 0.12675 on the test dataset, ranking 953rd globally.
 
 ## Project Structure
 
